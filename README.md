@@ -12,7 +12,7 @@ A lightweight near real-time offline speech-to-text for low-resource systems (e.
 
 ## Memory Usage
 
-Approximate RAM consumption by model size (tested on macOS):
+Approximate RAM consumption by model size (tested on macOS15):
 
 | Model    | RAM Usage |
 |----------|-----------|
