@@ -130,4 +130,4 @@ The first run may take time as Whisper models are downloaded and loaded. Subsequ
 
 ## License
 
-This project is licensed under the same license as [pywhispercpp](https://github.com/absadiki/pywhispercpp/blob/main/LICENSE)/[whisper.cpp](https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE) (MIT License).
+This project is licensed under the same license as [pywhispercpp](https://github.com/absadiki/pywhispercpp/blob/main/LICENSE)/[whisper.cpp](https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE) ([MIT License](https://github.com/Kavan00/LightWhisperSTT/blob/release/LICENSE)).
