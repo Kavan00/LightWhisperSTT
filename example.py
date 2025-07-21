@@ -4,5 +4,5 @@ def handle_transcription(text):
     print(f"Transcribed: {text['text']}")
     # Your custom processing here
 
-test = LightWhisperSTT(model_name="medium", language="de", on_transcription=handle_transcription)
+test = LightWhisperSTT(model_name="medium", language="de", on_transcription=handle_transcription, print_debug=True)
 test.start()
