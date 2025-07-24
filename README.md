@@ -36,10 +36,7 @@ Approximate RAM consumption by model size (tested on macOS15):
 ## Installation
 
 ```bash
-git clone https://github.com/Kavan00/LightWhisperSTT
-cd LightWhisperSTT
-pip install sounddevice numpy pywhispercpp webrtcvad
-python3 example.py
+pip install lightwhisperstt
 ```
 
 **Note**: You may need to install additional system dependencies for audio recording depending on your platform.
@@ -49,17 +46,17 @@ python3 example.py
 ### Basic Usage
 
 ```python
-from LightWhisperSTT.LightWhisperSTT import LightWhisperSTT
+from lightwhisperstt.core import LightWhisperSTT
 
 # Create STT instance with default settings
 stt = LightWhisperSTT()
 
 # Start transcription (blocks until stopped)
 try:
-    stt.start()
+   stt.start()
 except KeyboardInterrupt:
-    stt.stop()
-    print("Transcription stopped")
+   stt.stop()
+   print("Transcription stopped")
 ```
 
 ### With Custom Configuration
@@ -134,7 +131,7 @@ The first run may take time as Whisper models are downloaded and loaded. Subsequ
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.10+
 - sounddevice
 - numpy
 - pywhispercpp

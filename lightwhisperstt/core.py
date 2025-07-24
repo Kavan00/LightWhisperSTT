@@ -43,9 +43,9 @@ class LightWhisperSTT:
 
         self.buffer = deque(maxlen=self.sample_rate * window_seconds)
         self.audio_queue = queue.Queue()
-        self.model_lock = threading.Lock()
         self.index = 0
         self.running = False
+
 
         self.model = Model(model_name, print_progress=False, n_threads=model_threads, language=language)
         self.on_transcription = on_transcription
@@ -58,9 +58,11 @@ class LightWhisperSTT:
         frame = indata[:, 0]
         audio_frame = frame.tobytes()[:960]  # 30ms * 16kHz * 2 Bytes
 
+        # Should calculate faster but is not precise
+        volume = np.abs(frame).mean()
+        #volume = np.sqrt(np.mean(frame.astype(np.float32) ** 2))
         is_speech = self.is_speech(audio_frame)
-        rms = np.sqrt(np.mean(frame.astype(np.float32) ** 2))
-        self.speech_window.append(is_speech and rms > self.rms_threshold)
+        self.speech_window.append(is_speech and volume > self.rms_threshold)
         speech_ratio = sum(self.speech_window) / len(self.speech_window)
 
         if not self.triggered and speech_ratio > self.start_threshold:
@@ -83,7 +85,7 @@ class LightWhisperSTT:
     def flush_buffer(self):
         if self.print_debug: print("⏹️ Speech ended → enqueue")
         self.triggered = False
-        snippet = np.array(self.buffer).copy()
+        snippet = np.array(self.buffer)
         self.audio_queue.put((self.index, snippet))
         self.buffer.clear()
         self.silence_counter = 0
@@ -104,7 +106,7 @@ class LightWhisperSTT:
                         if self.print_debug:
                             print("Max buffer reached → forced flush")
                         self.flush_buffer()
-                    time.sleep(0.05)
+                    time.sleep(0.01)
             except KeyboardInterrupt:
                 if self.print_debug:
                     print("Interrupted")
@@ -113,8 +115,7 @@ class LightWhisperSTT:
         while True:
             index, audio = self.audio_queue.get()
             try:
-                with self.model_lock:
-                    segments = self.model.transcribe(audio)
+                segments = self.model.transcribe(audio)
                 for segment in segments:
                     entry = {"index": index, "text": segment.text.strip()}
                     self.transcripts.append(entry)
@@ -133,8 +134,7 @@ class LightWhisperSTT:
         return self.model.available_languages()
 
     def start(self):
-        for _ in range(2):
-            threading.Thread(target=self.transcriber_worker, daemon=True).start()
+        threading.Thread(target=self.transcriber_worker, daemon=True).start()
         self.recorder_loop()
 
     def stop(self):
