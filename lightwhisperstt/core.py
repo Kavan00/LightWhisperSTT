@@ -6,6 +6,7 @@ import webrtcvad
 from collections import deque
 from pywhispercpp.model import Model
 import time
+import librosa
 
 
 class LightWhisperSTT:
@@ -23,7 +24,8 @@ class LightWhisperSTT:
                  print_debug=False,  # Enable debug output
                  ):
 
-        self.sample_rate = 16000
+        self.input_sample_rate = self._detect_sample_rate()
+        self.target_sample_rate = 16000  # Whisper's preferred rate
         self.channels = 1
         self.chunk_size = chunk_size
         self.window_seconds = window_seconds
@@ -37,22 +39,31 @@ class LightWhisperSTT:
         self.start_threshold = start_threshold
         self.end_threshold = end_threshold
 
-        self.pre_buffer = deque(maxlen=self.sample_rate * 1)  # 1s PreBuffer
-        self.post_silence_frames = int(0.3 * self.sample_rate)  # 0.3s Post
+        self.pre_buffer = deque(maxlen=self.input_sample_rate * 1)  # 1s PreBuffer
+        self.post_silence_frames = int(0.3 * self.input_sample_rate)  # 0.3s Post
         self.speech_window = deque(maxlen=2)  # 2 Frames
 
-        self.buffer = deque(maxlen=self.sample_rate * window_seconds)
+        self.buffer = deque(maxlen=self.input_sample_rate * window_seconds)
         self.audio_queue = queue.Queue()
         self.index = 0
         self.running = False
-
 
         self.model = Model(model_name, print_progress=False, n_threads=model_threads, language=language)
         self.on_transcription = on_transcription
         self.transcripts = []
 
+    def _detect_sample_rate(self):
+        test_rates = [16000, 44100, 48000]
+        for rate in test_rates:
+            try:
+                sd.check_input_settings(samplerate=rate, channels=1)
+                return rate
+            except:
+                continue
+        return 16000
+
     def is_speech(self, frame_bytes):
-        return self.vad.is_speech(frame_bytes, self.sample_rate)
+        return self.vad.is_speech(frame_bytes, 16000)  # VAD expects 16kHz
 
     def audio_callback(self, indata, frames, time_info, status):
         frame = indata[:, 0]
@@ -60,7 +71,7 @@ class LightWhisperSTT:
 
         # Should calculate faster but is not precise
         volume = np.abs(frame).mean()
-        #volume = np.sqrt(np.mean(frame.astype(np.float32) ** 2))
+        # volume = np.sqrt(np.mean(frame.astype(np.float32) ** 2))
         is_speech = self.is_speech(audio_frame)
         self.speech_window.append(is_speech and volume > self.rms_threshold)
         speech_ratio = sum(self.speech_window) / len(self.speech_window)
@@ -86,6 +97,13 @@ class LightWhisperSTT:
         if self.print_debug: print("⏹️ Speech ended → enqueue")
         self.triggered = False
         snippet = np.array(self.buffer)
+
+        # Resample to 16kHz for Whisper if needed
+        if self.input_sample_rate != self.target_sample_rate:
+            snippet = librosa.resample(snippet.astype(np.float32),
+                                       orig_sr=self.input_sample_rate,
+                                       target_sr=self.target_sample_rate)
+
         self.audio_queue.put((self.index, snippet))
         self.buffer.clear()
         self.silence_counter = 0
@@ -94,7 +112,7 @@ class LightWhisperSTT:
 
     def recorder_loop(self):
         with sd.InputStream(callback=self.audio_callback,
-                            samplerate=self.sample_rate,
+                            samplerate=self.input_sample_rate,
                             channels=self.channels,
                             blocksize=self.chunk_size):
             if self.print_debug:
@@ -102,7 +120,7 @@ class LightWhisperSTT:
             self.running = True
             try:
                 while self.running:
-                    if len(self.buffer) >= self.sample_rate * self.window_seconds:
+                    if len(self.buffer) >= self.input_sample_rate * self.window_seconds:
                         if self.print_debug:
                             print("Max buffer reached → forced flush")
                         self.flush_buffer()
